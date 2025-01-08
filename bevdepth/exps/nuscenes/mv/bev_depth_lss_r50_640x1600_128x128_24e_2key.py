@@ -32,4 +32,4 @@ class BEVDepthLightningModel(BaseBEVDepthLightningModel):
 
 if __name__ == '__main__':
     run_cli(BEVDepthLightningModel,
-            'bev_depth_lss_r50_512x1408_128x128_24e_2key')
+            'bev_depth_lss_r50_640x1600_128x128_24e_2key') #名字都不对
