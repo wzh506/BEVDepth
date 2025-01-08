@@ -1,0 +1,13 @@
+export PATH=/usr/local/cuda-11.1/bin${PATH:+:${PATH}}
+export LD_LIBRARY_PATH=/usr/local/cuda-11.1/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
+
+conda install pytorch==1.9.0 torchvision==0.10.0 torchaudio==0.9.0 cudatoolkit=11.3 -c pytorch -c conda-forge
+#这东西会自动安装cudatoolkit=11.3，我不选择他就会安装11.1版本的，没办法
+
+#pip install torch==1.9.0+cu111 torchvision==0.10.0+cu111 torchaudio==0.9.0 -f https://download.pytorch.org/whl/torch_stable.html
+# 也不知道mmdet3d那些还能不能使用(教训：尽量不要使用conda安装pytorch，老是有些奇奇怪怪的问题)
+
+2.训练代码
+python bevdepth/exps/nuscenes/mv/bev_depth_lss_r50_640x1600_128x128_24e_2key.py --amp_backend native -b 4 --gpus 2
+python bevdepth/exps/nuscenes/mv/bev_depth_lss_r50_640x1600_128x128_24e_2key.py --ckpt_path [CKPT_PATH] -e -b 8 --gpus 2
+这代码逆天了，用pytorch lightning套了一层mmdet3d，使用起来一堆bug

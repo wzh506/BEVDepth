@@ -71,5 +71,5 @@ setup(
             sources_cuda=['src/voxel_pooling_inference_forward_cuda.cu'],
         ),
     ],
-    cmdclass={'build_ext': BuildExtension},
+    cmdclass={'build_ext': BuildExtension}, #说白了这里有个voxel_pooling的算子
 )
