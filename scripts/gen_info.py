@@ -34,7 +34,7 @@ def generate_info(nusc, scenes, max_cam_sweeps=6, max_lidar_sweeps=10):
                 sweep_cam_info = dict()
                 sweep_cam_info['sample_token'] = cam_data['sample_token']
                 sweep_cam_info['ego_pose'] = nusc.get(
-                    'ego_pose', cam_data['ego_pose_token'])
+                    'ego_pose', cam_data['ego_pose_token']) #cam有个什么ego_pose?
                 sweep_cam_info['timestamp'] = cam_data['timestamp']
                 sweep_cam_info['is_key_frame'] = cam_data['is_key_frame']
                 sweep_cam_info['height'] = cam_data['height']

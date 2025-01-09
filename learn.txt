@@ -9,6 +9,8 @@ conda install pytorch==1.9.0 torchvision==0.10.0 torchaudio==0.9.0 cudatoolkit=1
 
 2.训练代码
 #最多batch=3,否则会显存报错
-python bevdepth/exps/nuscenes/mv/bev_depth_lss_r50_640x1600_128x128_24e_2key.py --amp_backend native -b 2 --gpus 2
-python bevdepth/exps/nuscenes/mv/bev_depth_lss_r50_640x1600_128x128_24e_2key.py --ckpt_path [CKPT_PATH] -e -b 8 --gpus 2
-这代码逆天了，用pytorch lightning套了一层mmdet3d，使用起来一堆bug
+python bevdepth/exps/nuscenes/mv/bev_depth_lss_r50_256x704_128x128_20e_cbgs_2key_da_ema.py --amp_backend native -b 2 --gpus 1
+python bevdepth/exps/nuscenes/mv/bev_depth_lss_r50_256x704_128x128_20e_cbgs_2key_da.py --ckpt_path outputs/bev_depth_lss_r50_256x704_128x128_20e_cbgs_2key_da.pth -e -b 4 --gpus 2
+这代码逆天了，用pytorch lightning套了一层mmdet3d，使用起来一堆bug,debug会卡死在pytorch-lightning
+3.bug发现
+debug会在数据读取的位置卡死，暂时放弃了 ---后续发现是num_workers必须设为0，以后debug调试时应该降低num_workers

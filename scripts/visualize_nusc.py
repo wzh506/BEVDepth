@@ -146,7 +146,7 @@ def demo(
         'CAM_FRONT_LEFT', 'CAM_FRONT', 'CAM_FRONT_RIGHT', 'CAM_BACK_RIGHT',
         'CAM_BACK', 'CAM_BACK_LEFT'
     ]
-    infos = mmcv.load('data/nuScenes/nuscenes_12hz_infos_val.pkl')
+    infos = mmcv.load('data/nuScenes/nuscenes_infos_val.pkl')
     assert idx < len(infos)
     # Get data from dataset
     results = mmcv.load(nusc_results_file)['results']
@@ -280,3 +280,4 @@ if __name__ == '__main__':
         args.result_path,
         args.target_path,
     )
+# python scripts/visualize_nusc.py 0 outputs/bev_depth_lss_r50_256x704_128x128_20e_cbgs_2key_da/results_nusc.json outputs/bev_depth_lss_r50_256x704_128x128_20e_cbgs_2key_da/plots/0.jpg

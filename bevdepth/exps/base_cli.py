@@ -8,12 +8,16 @@ from bevdepth.callbacks.ema import EMACallback
 from bevdepth.utils.torch_dist import all_gather_object, synchronize
 
 from .nuscenes.base_exp import BEVDepthLightningModel
-
+import ctypes
 
 def run_cli(model_class=BEVDepthLightningModel,
             exp_name='base_exp',
             use_ema=False,
             extra_trainer_config_args={}):
+    #防止x11图形库报错
+    # libX11 = ctypes.cdll.LoadLibrary("libX11.so")
+    # libX11.XInitThreads() #gpu设为1就是会报错
+
     parent_parser = ArgumentParser(add_help=False)
     parent_parser = pl.Trainer.add_argparse_args(parent_parser)
     parent_parser.add_argument('-e',
@@ -56,7 +60,7 @@ def run_cli(model_class=BEVDepthLightningModel,
     else:
         trainer = pl.Trainer.from_argparse_args(args)
     if args.evaluate:
-        trainer.test(model, ckpt_path=args.ckpt_path)
+        trainer.test(model, ckpt_path=args.ckpt_path) #这里进行model的test
     elif args.predict:
         predict_step_outputs = trainer.predict(model, ckpt_path=args.ckpt_path)
         all_pred_results = list()

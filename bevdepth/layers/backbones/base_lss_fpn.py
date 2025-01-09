@@ -303,8 +303,8 @@ class DepthAggregation(nn.Module):
             # nn.BatchNorm3d(out_channels),
             # nn.ReLU(inplace=True),
         )
-
-    @autocast(False)
+    # 
+    @autocast(True)
     def forward(self, x):
         x = self.reduce_conv(x)
         x = self.conv(x) + x
@@ -501,12 +501,12 @@ class BaseLSSFPN(nn.Module):
 
         Returns:
             Tensor: BEV feature map.
-        """
+        """ #depth net，核心代码
         batch_size, num_sweeps, num_cams, num_channels, img_height, \
-            img_width = sweep_imgs.shape
-        img_feats = self.get_cam_feats(sweep_imgs)
+            img_width = sweep_imgs.shape#输入的图片num_sweeps=1
+        img_feats = self.get_cam_feats(sweep_imgs)#过一个backbone
         source_features = img_feats[:, 0, ...]
-        depth_feature = self._forward_depth_net(
+        depth_feature = self._forward_depth_net( #这里就是depth_net
             source_features.reshape(batch_size * num_cams,
                                     source_features.shape[2],
                                     source_features.shape[3],
@@ -514,7 +514,7 @@ class BaseLSSFPN(nn.Module):
             mats_dict,
         )
         depth = depth_feature[:, :self.depth_channels].softmax(
-            dim=1, dtype=depth_feature.dtype)
+            dim=1, dtype=depth_feature.dtype)#为啥只取前面112个channel
         geom_xyz = self.get_geometry(
             mats_dict['sensor2ego_mats'][:, sweep_index, ...],
             mats_dict['intrin_mats'][:, sweep_index, ...],
@@ -592,7 +592,7 @@ class BaseLSSFPN(nn.Module):
             0,
             sweep_imgs[:, 0:1, ...],
             mats_dict,
-            is_return_depth=is_return_depth)
+            is_return_depth=is_return_depth) #一个featrue map 一个depth map
         if num_sweeps == 1:
             return key_frame_res
 
@@ -601,15 +601,15 @@ class BaseLSSFPN(nn.Module):
 
         ret_feature_list = [key_frame_feature]
         for sweep_index in range(1, num_sweeps):
-            with torch.no_grad():
-                feature_map = self._forward_single_sweep(
+            with torch.no_grad(): #而且这里是不参与梯度计算的
+                feature_map = self._forward_single_sweep( #
                     sweep_index,
                     sweep_imgs[:, sweep_index:sweep_index + 1, ...],
                     mats_dict,
                     is_return_depth=False)
-                ret_feature_list.append(feature_map)
+                ret_feature_list.append(feature_map)#depth只通过第一个key frame计算,不参与梯度计算
 
         if is_return_depth:
-            return torch.cat(ret_feature_list, 1), key_frame_res[1]
+            return torch.cat(ret_feature_list, 1), key_frame_res[1] #前一个是feature map,后一个是depth map
         else:
             return torch.cat(ret_feature_list, 1)

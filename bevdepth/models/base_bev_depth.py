@@ -43,7 +43,7 @@ class BaseBEVDepth(nn.Module):
                     shape of (B, num_sweeps, num_cameras, 4, 4).
                 sensor2sensor_mats(Tensor): Transformation matrix
                     from key frame camera to sweep frame camera with
-                    shape of (B, num_sweeps, num_cameras, 4, 4).
+                    shape of (B, num_sweeps, num_cameras, 4, 4). #一个key带一个sweep
                 bda_mat(Tensor): Rotation matrix for bda with shape
                     of (B, 4, 4).
             timestamps (long): Timestamp.
@@ -56,8 +56,8 @@ class BaseBEVDepth(nn.Module):
             x, depth_pred = self.backbone(x,
                                           mats_dict,
                                           timestamps,
-                                          is_return_depth=True)
-            preds = self.head(x)
+                                          is_return_depth=True) #不理解为什么要用时序两帧
+            preds = self.head(x) #预测出来物体数量和类别
             return preds, depth_pred
         else:
             x = self.backbone(x, mats_dict, timestamps)

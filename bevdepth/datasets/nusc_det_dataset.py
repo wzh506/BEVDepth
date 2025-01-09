@@ -141,7 +141,7 @@ def depth_transform(cam_depth, resize, resize_dims, crop, flip, rotate):
 
     depth_coords = cam_depth[:, :2].astype(np.int16)
 
-    depth_map = np.zeros(resize_dims)
+    depth_map = np.zeros(resize_dims) #看来没有电云的位置应该是直接mask掉
     valid_mask = ((depth_coords[:, 1] < resize_dims[0])
                   & (depth_coords[:, 0] < resize_dims[1])
                   & (depth_coords[:, 1] >= 0)
@@ -149,7 +149,7 @@ def depth_transform(cam_depth, resize, resize_dims, crop, flip, rotate):
     depth_map[depth_coords[valid_mask, 1],
               depth_coords[valid_mask, 0]] = cam_depth[valid_mask, 2]
 
-    return torch.Tensor(depth_map)
+    return torch.Tensor(depth_map)#高度稀疏，很多地方都是0（是0）
 
 
 def map_pointcloud_to_image(
@@ -188,7 +188,7 @@ def map_pointcloud_to_image(
 
     # Fifth step: actually take a "picture" of the point cloud.
     # Grab the depths (camera frame z axis points away from the camera).
-    depths = lidar_points.points[2, :]
+    depths = lidar_points.points[2, :]#z轴的值
     coloring = depths
 
     # Take the actual picture (matrix multiplication with camera-matrix
@@ -196,7 +196,7 @@ def map_pointcloud_to_image(
     points = view_points(lidar_points.points[:3, :],
                          np.array(cam_calibrated_sensor['camera_intrinsic']),
                          normalize=True)
-
+    # 3,34720
     # Remove points that are either outside or behind the camera.
     # Leave a margin of 1 pixel for aesthetic reasons. Also make
     # sure points are at least 1m in front of the camera to avoid
@@ -211,7 +211,7 @@ def map_pointcloud_to_image(
     points = points[:, mask]
     coloring = coloring[mask]
 
-    return points, coloring
+    return points, coloring#深度信息
 
 
 class NuscDetDataset(Dataset):
@@ -360,15 +360,15 @@ class NuscDetDataset(Dataset):
             flip_dy = False
         return rotate_bda, scale_bda, flip_dx, flip_dy
 
-    def get_lidar_depth(self, lidar_points, img, lidar_info, cam_info):
+    def get_lidar_depth(self, lidar_points, img, lidar_info, cam_info): #看看这里怎么搞的深度
         lidar_calibrated_sensor = lidar_info['LIDAR_TOP']['calibrated_sensor']
         lidar_ego_pose = lidar_info['LIDAR_TOP']['ego_pose']
         cam_calibrated_sensor = cam_info['calibrated_sensor']
         cam_ego_pose = cam_info['ego_pose']
         pts_img, depth = map_pointcloud_to_image(
             lidar_points.copy(), img, lidar_calibrated_sensor.copy(),
-            lidar_ego_pose.copy(), cam_calibrated_sensor, cam_ego_pose)
-        return np.concatenate([pts_img[:2, :].T, depth[:, None]],
+            lidar_ego_pose.copy(), cam_calibrated_sensor, cam_ego_pose)#occ偷了这个
+        return np.concatenate([pts_img[:2, :].T, depth[:, None]], #转换为uvz
                               axis=1).astype(np.float32)
 
     def get_image(self, cam_infos, cams, lidar_infos=None):
@@ -388,7 +388,7 @@ class NuscDetDataset(Dataset):
             Tensor: timestamps.
             dict: meta infos needed for evaluation.
         """
-        assert len(cam_infos) > 0
+        assert len(cam_infos) > 0 #难道是batch?
         sweep_imgs = list()
         sweep_sensor2ego_mats = list()
         sweep_intrin_mats = list()
@@ -420,7 +420,7 @@ class NuscDetDataset(Dataset):
             for sweep_idx, cam_info in enumerate(cam_infos):
 
                 img = Image.open(
-                    os.path.join(self.data_root, cam_info[cam]['filename']))
+                    os.path.join(self.data_root, cam_info[cam]['filename']))#全是keyframe
                 # img = Image.fromarray(img)
                 w, x, y, z = cam_info[cam]['calibrated_sensor']['rotation']
                 # sweep sensor to sweep ego
@@ -483,7 +483,7 @@ class NuscDetDataset(Dataset):
                         sweep_lidar_points[sweep_idx], img,
                         lidar_infos[sweep_idx], cam_info[cam])
                     point_depth_augmented = depth_transform(
-                        point_depth, resize, self.ida_aug_conf['final_dim'],
+                        point_depth, resize, self.ida_aug_conf['final_dim'],#维度显然不对应
                         crop, flip, rotate_ida)
                     lidar_depth.append(point_depth_augmented)
                 img, ida_mat = img_transform(
@@ -531,7 +531,7 @@ class NuscDetDataset(Dataset):
         ]
         if self.return_depth:
             ret_list.append(torch.stack(sweep_lidar_depth).permute(1, 0, 2, 3))
-        return ret_list
+        return ret_list #总共8个元素，最后一个7是深度
 
     def get_gt(self, info, cams):
         """Generate gt labels from info.
@@ -554,7 +554,7 @@ class NuscDetDataset(Dataset):
         rot = Quaternion(ego2global_rotation).inverse
         gt_boxes = list()
         gt_labels = list()
-        for ann_info in info['ann_infos']:
+        for ann_info in info['ann_infos']:#这里有多个带有标签的物体吧？
             # Use ego coordinate.
             if (map_name_from_general_to_detection[ann_info['category_name']]
                     not in self.classes
@@ -574,7 +574,7 @@ class NuscDetDataset(Dataset):
             box_yaw = np.array([box.orientation.yaw_pitch_roll[0]])
             box_velo = np.array(box.velocity[:2])
             gt_box = np.concatenate([box_xyz, box_dxdydz, box_yaw, box_velo])
-            gt_boxes.append(gt_box)
+            gt_boxes.append(gt_box)#看样子sweeps的gt是通过keyframe的gt递推获得的
             gt_labels.append(
                 self.classes.index(map_name_from_general_to_detection[
                     ann_info['category_name']]))
@@ -611,13 +611,13 @@ class NuscDetDataset(Dataset):
             elif self.infos[cur_idx]['scene_token'] != self.infos[idx][
                     'scene_token']:
                 cur_idx = idx
-            info = self.infos[cur_idx]
-            cam_infos.append(info['cam_infos'])
+            info = self.infos[cur_idx] #还需要去看看self.infos如何构造的
+            cam_infos.append(info['cam_infos'])#关系：cam_infos->self.infos[cur_idx]['cam_infos']
             lidar_infos.append(info['lidar_infos'])
             lidar_sweep_timestamps = [
                 lidar_sweep['LIDAR_TOP']['timestamp']
                 for lidar_sweep in info['lidar_sweeps']
-            ]
+            ] #每次有4个lidar_sweeps
             for sweep_idx in self.sweeps_idx:
                 if len(info['cam_sweeps']) == 0:
                     cam_infos.append(info['cam_infos'])
@@ -655,7 +655,7 @@ class NuscDetDataset(Dataset):
             img_metas,
         ) = image_data_list[:7]
         img_metas['token'] = self.infos[idx]['sample_token']
-        if self.is_train:
+        if self.is_train:#原则上sweeps是没有gt的
             gt_boxes, gt_labels = self.get_gt(self.infos[idx], cams)
         # Temporary solution for test.
         else:
@@ -679,7 +679,7 @@ class NuscDetDataset(Dataset):
             sweep_timestamps,
             img_metas,
             gt_boxes,
-            gt_labels,
+            gt_labels,#这里应该就只有一帧的
         ]
         if self.return_depth:
             ret_list.append(image_data_list[7])
@@ -711,7 +711,7 @@ def collate_fn(data, is_return_depth=False):
     depth_labels_batch = list()
     for iter_data in data:
         (
-            sweep_imgs,
+            sweep_imgs,#这两张图片共用一个gt_boxes
             sweep_sensor2ego_mats,
             sweep_intrins,
             sweep_ida_mats,
@@ -720,7 +720,7 @@ def collate_fn(data, is_return_depth=False):
             sweep_timestamps,
             img_metas,
             gt_boxes,
-            gt_labels,
+            gt_labels,#这个gt对应那一帧的？？
         ) = iter_data[:10]
         if is_return_depth:
             gt_depth = iter_data[10]

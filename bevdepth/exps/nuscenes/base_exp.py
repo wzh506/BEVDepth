@@ -17,7 +17,7 @@ from bevdepth.datasets.nusc_det_dataset import NuscDetDataset, collate_fn
 from bevdepth.evaluators.det_evaluators import DetNuscEvaluator
 from bevdepth.models.base_bev_depth import BaseBEVDepth
 from bevdepth.utils.torch_dist import all_gather_object, get_rank, synchronize
-
+# 这些变量能在下面初始化直接使用吗？
 H = 900
 W = 1600
 final_dim = (256, 704)
@@ -191,7 +191,7 @@ class BEVDepthLightningModel(LightningModule):
                  eval_interval=1,
                  batch_size_per_device=8,
                  class_names=CLASSES,
-                 backbone_conf=backbone_conf,
+                 backbone_conf=backbone_conf, #这里的backbone_conf是上面定义的,可以直接调用上面的变量！
                  head_conf=head_conf,
                  ida_aug_conf=ida_aug_conf,
                  bda_aug_conf=bda_aug_conf,
@@ -239,18 +239,18 @@ class BEVDepthLightningModel(LightningModule):
         return self.model(sweep_imgs, mats)
 
     def training_step(self, batch):
-        (sweep_imgs, mats, _, _, gt_boxes, gt_labels, depth_labels) = batch
-        if torch.cuda.is_available():
+        (sweep_imgs, mats, _, _, gt_boxes, gt_labels, depth_labels) = batch #depth_labels也只有一个
+        if torch.cuda.is_available(): 
             for key, value in mats.items():
                 mats[key] = value.cuda()
             sweep_imgs = sweep_imgs.cuda()
             gt_boxes = [gt_box.cuda() for gt_box in gt_boxes]
             gt_labels = [gt_label.cuda() for gt_label in gt_labels]
-        preds, depth_preds = self(sweep_imgs, mats)
+        preds, depth_preds = self(sweep_imgs, mats)#对应forward函数,但是输入两个关键帧干什么？
         if isinstance(self.model, torch.nn.parallel.DistributedDataParallel):
             targets = self.model.module.get_targets(gt_boxes, gt_labels)
             detection_loss = self.model.module.loss(targets, preds)
-        else:
+        else: #目标检测的部分就不用关注了
             targets = self.model.get_targets(gt_boxes, gt_labels)
             detection_loss = self.model.loss(targets, preds)
 
@@ -261,11 +261,11 @@ class BEVDepthLightningModel(LightningModule):
         self.log('detection_loss', detection_loss)
         self.log('depth_loss', depth_loss)
         return detection_loss + depth_loss
-
+    #实际上这两个depth尺度完全不一样
     def get_depth_loss(self, depth_labels, depth_preds):
-        depth_labels = self.get_downsampled_gt_depth(depth_labels)
+        depth_labels = self.get_downsampled_gt_depth(depth_labels)#前后维度有所变化,这里无法理解
         depth_preds = depth_preds.permute(0, 2, 3, 1).contiguous().view(
-            -1, self.depth_channels)
+            -1, self.depth_channels) #直接reshape维度和上面depth_labels保持一致
         fg_mask = torch.max(depth_labels, dim=1).values > 0.0
 
         with autocast(enabled=False):
@@ -277,7 +277,7 @@ class BEVDepthLightningModel(LightningModule):
 
         return 3.0 * depth_loss
 
-    def get_downsampled_gt_depth(self, gt_depths):
+    def get_downsampled_gt_depth(self, gt_depths): #如何使用one-hot处理深度图
         """
         Input:
             gt_depths: [B, N, H, W]
@@ -310,7 +310,7 @@ class BEVDepthLightningModel(LightningModule):
             gt_depths, torch.zeros_like(gt_depths))
         gt_depths = F.one_hot(gt_depths.long(),
                               num_classes=self.depth_channels + 1).view(
-                                  -1, self.depth_channels + 1)[:, 1:]
+                                  -1, self.depth_channels + 1)[:, 1:] #depth channanel中只有一个是1
 
         return gt_depths.float()
 
@@ -352,7 +352,7 @@ class BEVDepthLightningModel(LightningModule):
         if get_rank() == 0:
             self.evaluator.evaluate(all_pred_results, all_img_metas)
 
-    def test_epoch_end(self, test_step_outputs):
+    def test_epoch_end(self, test_step_outputs):#eval使用这个
         all_pred_results = list()
         all_img_metas = list()
         for test_step_output in test_step_outputs:
@@ -397,7 +397,7 @@ class BEVDepthLightningModel(LightningModule):
         train_loader = torch.utils.data.DataLoader(
             train_dataset,
             batch_size=self.batch_size_per_device,
-            num_workers=4,
+            num_workers=0,#设为0
             drop_last=True,
             shuffle=False,
             collate_fn=partial(collate_fn,
@@ -425,7 +425,7 @@ class BEVDepthLightningModel(LightningModule):
             batch_size=self.batch_size_per_device,
             shuffle=False,
             collate_fn=partial(collate_fn, is_return_depth=self.use_fusion),
-            num_workers=4,
+            num_workers=0,
             sampler=None,
         )
         return val_loader
@@ -451,7 +451,7 @@ class BEVDepthLightningModel(LightningModule):
             batch_size=self.batch_size_per_device,
             shuffle=False,
             collate_fn=partial(collate_fn, is_return_depth=self.use_fusion),
-            num_workers=4,
+            num_workers=0,
             sampler=None,
         )
         return predict_loader
