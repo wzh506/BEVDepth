@@ -243,7 +243,7 @@ class DepthNet(nn.Module):
                 sensor2ego.view(batch_size, 1, num_cams, -1),
             ],
             -1,
-        )
+        ) #2，1，6，27 6个相机，把这个作为输入？。。。
         mlp_input = self.bn(mlp_input.reshape(-1, mlp_input.shape[-1]))
         x = self.reduce_conv(x)
         context_se = self.context_mlp(mlp_input)[..., None, None]
@@ -402,7 +402,7 @@ class BaseLSSFPN(nn.Module):
         return img_feat_with_depth
 
     def create_frustum(self):
-        """Generate frustum"""
+        """Generate frustum""" #这个frustum是干什么
         # make grid in image plane
         ogfH, ogfW = self.final_dim
         fH, fW = ogfH // self.downsample_factor, ogfW // self.downsample_factor
@@ -439,7 +439,7 @@ class BaseLSSFPN(nn.Module):
 
         # undo post-transformation
         # B x N x D x H x W x 3
-        points = self.frustum
+        points = self.frustum #这是个啥呀
         ida_mat = ida_mat.view(batch_size, num_cams, 1, 1, 1, 4, 4)
         points = ida_mat.inverse().matmul(points.unsqueeze(-1))
         # cam_to_ego
@@ -503,8 +503,8 @@ class BaseLSSFPN(nn.Module):
             Tensor: BEV feature map.
         """ #depth net，核心代码
         batch_size, num_sweeps, num_cams, num_channels, img_height, \
-            img_width = sweep_imgs.shape#输入的图片num_sweeps=1
-        img_feats = self.get_cam_feats(sweep_imgs)#过一个backbone
+            img_width = sweep_imgs.shape#输入的图片num_sweeps=1,idx为0就是关键帧
+        img_feats = self.get_cam_feats(sweep_imgs)#过一个backbone,resnet没有多尺度
         source_features = img_feats[:, 0, ...]
         depth_feature = self._forward_depth_net( #这里就是depth_net
             source_features.reshape(batch_size * num_cams,
@@ -512,9 +512,9 @@ class BaseLSSFPN(nn.Module):
                                     source_features.shape[3],
                                     source_features.shape[4]),
             mats_dict,
-        )
+        ) #输入torch.Size([12, 512, 16, 44])
         depth = depth_feature[:, :self.depth_channels].softmax(
-            dim=1, dtype=depth_feature.dtype)#为啥只取前面112个channel
+            dim=1, dtype=depth_feature.dtype)#只有前112是depth，后面是context,112个通道为1
         geom_xyz = self.get_geometry(
             mats_dict['sensor2ego_mats'][:, sweep_index, ...],
             mats_dict['intrin_mats'][:, sweep_index, ...],
@@ -523,16 +523,16 @@ class BaseLSSFPN(nn.Module):
         )
         geom_xyz = ((geom_xyz - (self.voxel_coord - self.voxel_size / 2.0)) /
                     self.voxel_size).int()
-        if self.training or self.use_da:
-            img_feat_with_depth = depth.unsqueeze(
+        if self.training or self.use_da:#可以不用数据增强
+            img_feat_with_depth = depth.unsqueeze( #[12，1，，112，16，44]
                 1) * depth_feature[:, self.depth_channels:(
-                    self.depth_channels + self.output_channels)].unsqueeze(2)
-
+                    self.depth_channels + self.output_channels)].unsqueeze(2) #后面只用了后面80的feature通道
+            # torch.Size([12, 80, 1, 16, 44]),这里有一个广播机制
             img_feat_with_depth = self._forward_voxel_net(img_feat_with_depth)
-
+            # voxel_net 大小差不多
             img_feat_with_depth = img_feat_with_depth.reshape(
-                batch_size,
-                num_cams,
+                batch_size, #2
+                num_cams,#6
                 img_feat_with_depth.shape[1],
                 img_feat_with_depth.shape[2],
                 img_feat_with_depth.shape[3],
@@ -540,7 +540,7 @@ class BaseLSSFPN(nn.Module):
             )
 
             img_feat_with_depth = img_feat_with_depth.permute(0, 1, 3, 4, 5, 2)
-
+            # 这个CUDA算子有点意思，需要看一下(CUDA Operator)
             feature_map = voxel_pooling_train(geom_xyz,
                                               img_feat_with_depth.contiguous(),
                                               self.voxel_num.cuda())
@@ -553,7 +553,7 @@ class BaseLSSFPN(nn.Module):
             # final_depth has to be fp32, otherwise the depth
             # loss will colapse during the traing process.
             return feature_map.contiguous(
-            ), depth_feature[:, :self.depth_channels].softmax(dim=1)
+            ), depth_feature[:, :self.depth_channels].softmax(dim=1)#为啥不用上面的depth??而且归一化到0~1
         return feature_map.contiguous()
 
     def forward(self,

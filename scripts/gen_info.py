@@ -147,7 +147,7 @@ def generate_info(nusc, scenes, max_cam_sweeps=6, max_lidar_sweeps=10):
 
 
 def main():
-    trainval_nusc = NuScenes(version='v1.0-trainval',
+    trainval_nusc = NuScenes(version='v1.0-mini', # 用mini
                              dataroot='./data/nuScenes/',
                              verbose=True)
     train_scenes = splits.train
@@ -156,12 +156,13 @@ def main():
     val_infos = generate_info(trainval_nusc, val_scenes)
     mmcv.dump(train_infos, './data/nuScenes/nuscenes_infos_train.pkl')
     mmcv.dump(val_infos, './data/nuScenes/nuscenes_infos_val.pkl')
-    test_nusc = NuScenes(version='v1.0-test',
-                         dataroot='./data/nuScenes/',
-                         verbose=True)
-    test_scenes = splits.test
-    test_infos = generate_info(test_nusc, test_scenes)
-    mmcv.dump(test_infos, './data/nuScenes/nuscenes_infos_test.pkl')
+    # 没有test
+    # test_nusc = NuScenes(version='v1.0-test',
+    #                      dataroot='./data/nuScenes/',
+    #                      verbose=True)
+    # test_scenes = splits.test
+    # test_infos = generate_info(test_nusc, test_scenes)
+    # mmcv.dump(test_infos, './data/nuScenes/nuscenes_infos_test.pkl')
 
 
 if __name__ == '__main__':

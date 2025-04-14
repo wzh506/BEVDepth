@@ -667,7 +667,7 @@ class NuscDetDataset(Dataset):
         bda_mat = sweep_imgs.new_zeros(4, 4)
         bda_mat[3, 3] = 1
         gt_boxes, bda_rot = bev_transform(gt_boxes, rotate_bda, scale_bda,
-                                          flip_dx, flip_dy)
+                                          flip_dx, flip_dy)# translation为0，只把gt_boxes旋转了
         bda_mat[:3, :3] = bda_rot
         ret_list = [
             sweep_imgs,

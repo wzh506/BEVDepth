@@ -266,21 +266,21 @@ class BEVDepthLightningModel(LightningModule):
         depth_labels = self.get_downsampled_gt_depth(depth_labels)#前后维度有所变化,这里无法理解
         depth_preds = depth_preds.permute(0, 2, 3, 1).contiguous().view(
             -1, self.depth_channels) #直接reshape维度和上面depth_labels保持一致
-        fg_mask = torch.max(depth_labels, dim=1).values > 0.0
+        fg_mask = torch.max(depth_labels, dim=1).values > 0.0 #为0的地方说明没有激光雷达的电云，就不参与计算了
 
         with autocast(enabled=False):
             depth_loss = (F.binary_cross_entropy(
                 depth_preds[fg_mask],
                 depth_labels[fg_mask],
                 reduction='none',
-            ).sum() / max(1.0, fg_mask.sum()))
+            ).sum() / max(1.0, fg_mask.sum())) #
 
         return 3.0 * depth_loss
 
     def get_downsampled_gt_depth(self, gt_depths): #如何使用one-hot处理深度图
         """
         Input:
-            gt_depths: [B, N, H, W]
+            gt_depths: [B, N, H, W] 2,6,256,704
         Output:
             gt_depths: [B*N*h*w, d]
         """
@@ -298,20 +298,20 @@ class BEVDepthLightningModel(LightningModule):
             -1, self.downsample_factor * self.downsample_factor)
         gt_depths_tmp = torch.where(gt_depths == 0.0,
                                     1e5 * torch.ones_like(gt_depths),
-                                    gt_depths)
-        gt_depths = torch.min(gt_depths_tmp, dim=-1).values
+                                    gt_depths) # 为true用1e5替换(非常大的深度），为false用原来的值
+        gt_depths = torch.min(gt_depths_tmp, dim=-1).values#8448,256,取最小值所有深度，
         gt_depths = gt_depths.view(B * N, H // self.downsample_factor,
-                                   W // self.downsample_factor)
-
+                                   W // self.downsample_factor) #相当于每256个选个最小的
+        #沿着采样的维度取最小值，因为采样的深度图可能存在多个深度值，取最小值
         gt_depths = (gt_depths -
-                     (self.dbound[0] - self.dbound[2])) / self.dbound[2]
+                     (self.dbound[0] - self.dbound[2])) / self.dbound[2] #感知
         gt_depths = torch.where(
             (gt_depths < self.depth_channels + 1) & (gt_depths >= 0.0),
-            gt_depths, torch.zeros_like(gt_depths))
-        gt_depths = F.one_hot(gt_depths.long(),
-                              num_classes=self.depth_channels + 1).view(
+            gt_depths, torch.zeros_like(gt_depths))#有些深度值可能超出范围，这里就不要了
+        gt_depths = F.one_hot(gt_depths.long(),#转换为整数,深度是多少那一维度就有值
+                              num_classes=self.depth_channels + 1).view( #0的就不要吧？
                                   -1, self.depth_channels + 1)[:, 1:] #depth channanel中只有一个是1
-
+        #gt_depths.view(2,6,16,44) 其中每一个16，44都是对应相机的深度图
         return gt_depths.float()
 
     def eval_step(self, batch, batch_idx, prefix: str):
